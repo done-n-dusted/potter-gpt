@@ -9,10 +9,10 @@ class Tokenizer:
         self.vocab_size = self.tokenizer.vocab_size
 
     def encode(self, input_string):
-        return self.tokenizer(input_string, return_tensors="pt")['input_ids']
+        return self.tokenizer([input_string], return_tensors="pt")['input_ids']
 
     def decode(self, encodings):
-        assert(len(encodings.shape) == 2)
+        # assert(len(encodings.shape) == 2)
         return self.tokenizer.batch_decode(encodings)
 
 if __name__ == "__main__":

@@ -87,13 +87,17 @@ class LanguageModel(nn.Module):
                  block_size=cfg.block_size):
         super().__init__()
 
+        self.vocab_size = vocab_size
+        self.n_blocks = n_blocks
+        self.n_embed = n_embed
+        self.num_heads = num_heads
+        self.block_size = block_size
 
-        self.token_embedding = nn.Embedding(vocab_size, n_embed)
-        self.position_embedding = nn.Embedding(block_size, n_embed)
+        self.token_embedding = nn.Embedding(self.vocab_size, self.n_embed)
+        self.position_embedding = nn.Embedding(self.block_size, self.n_embed)
+        self.blocks = nn.Sequential(*[Block(self.n_embed, self.num_heads) for _ in range(self.n_blocks)])
 
-        self.blocks = nn.Sequential(*[Block(n_embed, num_heads) for _ in range(n_blocks)])
-
-        self.linear = nn.Linear(n_embed, vocab_size)
+        self.linear = nn.Linear(self.n_embed, self.vocab_size)
     
     def forward(self, idx, targets = None):
         B, T = idx.shape
@@ -117,13 +121,15 @@ class LanguageModel(nn.Module):
     def generate_sequence(self, idx, max_new_tokens):
         B, T = idx.shape
         for _ in range(max_new_tokens):
-            idx_context = idx[:, -T:] # take last T tokens
+            idx_context = idx[:, -self.block_size:] # take last T tokens
             logits, loss = self(idx_context)
             # _, _, C = logits.shape
             logits = logits[:, -1, :] # B, C
-            probs = F.softmax(logits)
+            probs = F.softmax(logits, dim = -1)
             idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
-            idx = torch.cat([idx, idx_next])
+            # print("idx_next shape:", idx_next.shape)
+            # print("idx shape", idx.shape)
+            idx = torch.cat([idx, idx_next], dim = 1)
         return idx
 
 if __name__ == '__main__':
