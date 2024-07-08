@@ -1,9 +1,9 @@
 batch_size = 32
-block_size = 16
+block_size = 8
 device = 'cpu'
 tokenizer_model = "gpt2"
-n_embed = 32
+n_embed = 64
 dropout_rate = 0.4
 head_size = 16
-num_heads = 3
+num_heads = 4
 n_blocks = 3

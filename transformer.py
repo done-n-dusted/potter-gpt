@@ -9,12 +9,13 @@ class Head(nn.Module):
     def __init__(self, head_size, n_embed=cfg.n_embed, is_encoder=False):
         super().__init__()
         self.is_encoder = is_encoder
+        self.hs = head_size
         self.key = nn.Linear(n_embed, head_size, bias = False) # C to HS
         self.query = nn.Linear(n_embed, head_size, bias = False) # C to HS
         self.value = nn.Linear(n_embed, head_size, bias = False) # C to HS
 
         self.register_buffer("tril", torch.tril(torch.ones(cfg.block_size, cfg.block_size))) # T x T
-        self.dropout(nn.Dropout)
+        self.dropout = nn.Dropout(cfg.dropout_rate)
 
     def forward(self, x):
         B, T, C = x.shape
@@ -36,13 +37,17 @@ class MultiHead(nn.Module):
     def __init__(self, head_size, num_heads=cfg.num_heads):
         super().__init__()
 
-        self.heads = nn.ModuleList([Head(cfg.n_embed, head_size) for _ in range(num_heads)])
+        self.heads = nn.ModuleList([Head(n_embed=cfg.n_embed, head_size=head_size) for _ in range(num_heads)])
         self.projection = nn.Linear(cfg.n_embed, cfg.n_embed)
-        self.dropout(nn.Dropout)
+        self.dropout = nn.Dropout(cfg.dropout_rate)
 
 
     def forward(self, x):
-        return torch.cat([h(x) for h in self.heads])
+        out = torch.cat([h(x) for h in self.heads], dim=-1)
+        out = self.dropout(self.projection(out))
+        return out
+
+    
 
 class FeedForward(nn.Module):
 
@@ -53,7 +58,7 @@ class FeedForward(nn.Module):
             nn.Linear(n_embed, 4 * n_embed),
             nn.ReLU(),
             nn.Linear(4*n_embed,n_embed),
-            nn.Dropout(cfg.dropout),
+            nn.Dropout(cfg.dropout_rate),
         )
     
     def forward(self, x):
@@ -81,6 +86,8 @@ class LanguageModel(nn.Module):
                  n_embed = cfg.n_embed, num_heads = cfg.num_heads, 
                  block_size=cfg.block_size):
         super().__init__()
+
+
         self.token_embedding = nn.Embedding(vocab_size, n_embed)
         self.position_embedding = nn.Embedding(block_size, n_embed)
 
@@ -120,9 +127,11 @@ class LanguageModel(nn.Module):
         return idx
 
 if __name__ == '__main__':
-    vocab_size = 50257
-    head_size = 16
-    one_head = Head(cfg.n_embed, head_size)
-
+    model = LanguageModel(vocab_size=50)
+    X = torch.randint(0, 50, (1, cfg.block_size), dtype=torch.int)
+    print(X)
+    logits, _ = model(X)
+    print("logits:", logits)
+    print(logits.shape)
     pass
 
