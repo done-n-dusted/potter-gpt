@@ -1,6 +1,5 @@
 from transformers import AutoTokenizer
 import torch
-import config as cfg
 from textwrap import wrap
 
 class Tokenizer:
@@ -26,7 +25,7 @@ class Tokenizer:
 
 if __name__ == "__main__":
 
-    tokenizer = Tokenizer(name=cfg.tokenizer_model)
+    tokenizer = Tokenizer(name="gpt2")
     print(tokenizer.vocab_size)
     strings = ["This is a sample string", "this is the second string"]
     print("sentence:", strings)

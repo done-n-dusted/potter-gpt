@@ -1,22 +1,23 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import config as cfg
+import yaml
 from torchsummary import summary
 
 class Head(nn.Module):
     """One self attention head class"""
     # C is n_embed look up. Will be defined in final transformer model
-    def __init__(self, head_size, n_embed=cfg.n_embed, is_encoder=False):
+    def __init__(self, head_size, n_embed, block_size, dropout_rate, is_encoder=False):
         super().__init__()
         self.is_encoder = is_encoder
         self.hs = head_size
+        self.block_size = block_size
         self.key = nn.Linear(n_embed, head_size, bias = False) # C to HS
         self.query = nn.Linear(n_embed, head_size, bias = False) # C to HS
         self.value = nn.Linear(n_embed, head_size, bias = False) # C to HS
 
-        self.register_buffer("tril", torch.tril(torch.ones(cfg.block_size, cfg.block_size))) # T x T
-        self.dropout = nn.Dropout(cfg.dropout_rate)
+        self.register_buffer("tril", torch.tril(torch.ones(self.block_size, self.block_size))) # T x T
+        self.dropout = nn.Dropout(dropout_rate)
 
     def forward(self, x):
         B, T, C = x.shape
@@ -35,12 +36,12 @@ class Head(nn.Module):
 
 class MultiHead(nn.Module):
 
-    def __init__(self, head_size, num_heads=cfg.num_heads):
+    def __init__(self, head_size, num_heads, n_embed, block_size, dropout_rate):
         super().__init__()
 
-        self.heads = nn.ModuleList([Head(n_embed=cfg.n_embed, head_size=head_size) for _ in range(num_heads)])
-        self.projection = nn.Linear(cfg.n_embed, cfg.n_embed)
-        self.dropout = nn.Dropout(cfg.dropout_rate)
+        self.heads = nn.ModuleList([Head(n_embed=n_embed, head_size=head_size, block_size=block_size, dropout_rate=dropout_rate) for _ in range(num_heads)])
+        self.projection = nn.Linear(n_embed, n_embed)
+        self.dropout = nn.Dropout(dropout_rate)
 
 
     def forward(self, x):
@@ -52,26 +53,26 @@ class MultiHead(nn.Module):
 
 class FeedForward(nn.Module):
 
-    def __init__(self, n_embed = cfg.n_embed):
+    def __init__(self, n_embed, dropout_rate):
         super().__init__()
 
         self.net = nn.Sequential(
             nn.Linear(n_embed, 4 * n_embed),
             nn.ReLU(),
             nn.Linear(4*n_embed,n_embed),
-            nn.Dropout(cfg.dropout_rate),
+            nn.Dropout(dropout_rate),
         )
     
     def forward(self, x):
         return self.net(x)
 
 class Block(nn.Module):
-    def __init__(self, n_embed = cfg.n_embed, num_heads = cfg.num_heads):
+    def __init__(self, n_embed, num_heads, block_size, dropout_rate):
         super().__init__()
 
         head_size = n_embed // num_heads
-        self.multihead = MultiHead(num_heads=num_heads, head_size=head_size)
-        self.feedforward = FeedForward(n_embed)
+        self.multihead = MultiHead(num_heads=num_heads, head_size=head_size, n_embed=n_embed, block_size=block_size, dropout_rate=dropout_rate)
+        self.feedforward = FeedForward(n_embed, dropout_rate=dropout_rate)
         self.layer_norm1 = nn.LayerNorm(n_embed)
         self.layer_norm2 = nn.LayerNorm(n_embed)
 
@@ -83,9 +84,9 @@ class Block(nn.Module):
 
 class LanguageModel(nn.Module):
 
-    def __init__(self, vocab_size, n_blocks = cfg.n_blocks, 
-                 n_embed = cfg.n_embed, num_heads = cfg.num_heads, 
-                 block_size=cfg.block_size):
+    def __init__(self, vocab_size, n_blocks, 
+                 n_embed, num_heads, 
+                 block_size, dropout_rate):
         super().__init__()
 
         self.vocab_size = vocab_size
@@ -93,10 +94,11 @@ class LanguageModel(nn.Module):
         self.n_embed = n_embed
         self.num_heads = num_heads
         self.block_size = block_size
+        self.dropout_rate = dropout_rate
 
         self.token_embedding = nn.Embedding(self.vocab_size, self.n_embed)
         self.position_embedding = nn.Embedding(self.block_size, self.n_embed)
-        self.blocks = nn.Sequential(*[Block(self.n_embed, self.num_heads) for _ in range(self.n_blocks)])
+        self.blocks = nn.Sequential(*[Block(self.n_embed, self.num_heads, block_size=self.block_size, dropout_rate=self.dropout_rate) for _ in range(self.n_blocks)])
 
         self.linear = nn.Linear(self.n_embed, self.vocab_size)
     
@@ -105,7 +107,7 @@ class LanguageModel(nn.Module):
         B, T = idx.shape
 
         tokens = self.token_embedding(idx)
-        positions = self.position_embedding(torch.arange(T, device=cfg.device))
+        positions = self.position_embedding(torch.arange(T))
 
         x = tokens + positions
         x = self.blocks(x)
@@ -137,8 +139,15 @@ class LanguageModel(nn.Module):
     def summary(self):
         print(self)
 if __name__ == '__main__':
-    model = LanguageModel(vocab_size=50)
-    X = torch.randint(0, 50, (1, cfg.block_size), dtype=torch.int)
+    with open("config.yaml") as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+    model = LanguageModel(vocab_size=50,
+                          n_blocks = cfg['n_blocks'], 
+                          n_embed=cfg['n_embed'],
+                          num_heads=cfg['num_heads'],
+                          block_size=cfg['block_size'],
+                          dropout_rate=cfg['dropout_rate'])
+    X = torch.randint(0, 50, (1, cfg['block_size']), dtype=torch.int)
     print(X)
     logits, _ = model(X)
     print("logits:", logits)

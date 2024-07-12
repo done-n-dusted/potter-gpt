@@ -1,13 +1,15 @@
 import os
 import torch
 from tokenizer import Tokenizer
-import config as cfg
 from transformer import LanguageModel
 from tqdm import tqdm
-from textwrap import wrap
 import csv
+import yaml
 
-files = [cfg.data_path+x for x in os.listdir(cfg.data_path)]
+with open("config.yml") as f:
+    cfg = yaml.load(f, Loader=yaml.FullLoader)
+
+files = [cfg['data_path']+x for x in os.listdir(cfg['data_path'])]
 files.sort()
 
 text = ""
@@ -19,7 +21,7 @@ for file in files:
 # text = wrap(text, 1024)
 # text[-1] = text[-1] + " "*(1024 - len(text[-1]))
 print(len(text))
-tokenizer = Tokenizer(name=cfg.tokenizer_model)
+tokenizer = Tokenizer(name=cfg['tokenizer_model'])
 vocab_size = tokenizer.vocab_size
 
 print(f"Vocab size of {vocab_size}")
@@ -34,11 +36,16 @@ print(f"Vocab size of {vocab_size}")
 encoding = tokenizer.encode(text)
 print(type(encoding))
 print(f"encoding shape: {encoding.shape}")
-n = int(len(encoding) * cfg.train_val_split)
+n = int(len(encoding) * cfg['train_val_split'])
 train = encoding[:n]
 val = encoding[n:]
 
-model = LanguageModel(vocab_size=vocab_size)
+model = model = LanguageModel(vocab_size=vocab_size,
+                          n_blocks = cfg['n_blocks'], 
+                          n_embed=cfg['n_embed'],
+                          num_heads=cfg['num_heads'],
+                          block_size=cfg['block_size'],
+                          dropout_rate=cfg['dropout_rate'])
 # model.summary()
 print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
 # print(f"Number of parameters is {torch.numel(model.parameters())}")
@@ -46,9 +53,9 @@ print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
 
 def get_batch(split):
     data = train if split == "train" else val
-    ix = torch.randint(len(data) - cfg.block_size, (cfg.batch_size, ))
-    x = torch.stack([data[i:i+cfg.block_size] for i in ix])
-    y = torch.stack([data[i+1:i+cfg.block_size+1] for i in ix])    
+    ix = torch.randint(len(data) - cfg['block_size'], (cfg['batch_size'], ))
+    x = torch.stack([data[i:i+cfg['block_size']] for i in ix])
+    y = torch.stack([data[i+1:i+cfg['block_size']+1] for i in ix])    
     return x, y
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -67,7 +74,7 @@ print()
 # assert False
 
 losses = []
-for step in tqdm(range(cfg.epochs)):
+for step in tqdm(range(cfg['epochs'])):
     
     xb, yb = get_batch('train')
     
@@ -76,7 +83,7 @@ for step in tqdm(range(cfg.epochs)):
     loss.backward()
     optimizer.step()
 
-    mod = cfg.epochs // 50
+    mod = cfg['epochs'] // 50
     if step%(max(mod, 1)) == 0:
         print(f"step: {step}")
         # out = tokenizer.
@@ -86,14 +93,14 @@ for step in tqdm(range(cfg.epochs)):
         print()
         losses.append([step, loss.item(), ''.join(res)])
 
-if cfg.log_name:
+if cfg['log_name']:
     if not os.path.exists('results/'):
         os.makedirs('results/')
-    with open('results/' + cfg.log_name, "w") as f:
+    with open('results/' + cfg['log_name'], "w") as f:
         wr = csv.writer(f)
         wr.writerows(losses)
 
-if cfg.save_model:
+if cfg['save_model']:
     if not os.path.exists('results/'):
         os.makedirs('results/')
-    torch.save(model.state_dict(), 'results/' + cfg.save_model )
+    torch.save(model.state_dict(), 'results/' + cfg['save_model'] )
