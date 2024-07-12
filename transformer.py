@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import config as cfg
+from torchsummary import summary
 
 class Head(nn.Module):
     """One self attention head class"""
@@ -100,6 +101,7 @@ class LanguageModel(nn.Module):
         self.linear = nn.Linear(self.n_embed, self.vocab_size)
     
     def forward(self, idx, targets = None):
+        # print(idx.shape)
         B, T = idx.shape
 
         tokens = self.token_embedding(idx)
@@ -132,6 +134,8 @@ class LanguageModel(nn.Module):
             idx = torch.cat([idx, idx_next], dim = 1)
         return idx
 
+    def summary(self):
+        print(self)
 if __name__ == '__main__':
     model = LanguageModel(vocab_size=50)
     X = torch.randint(0, 50, (1, cfg.block_size), dtype=torch.int)

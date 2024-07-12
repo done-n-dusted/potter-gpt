@@ -7,7 +7,7 @@ from tqdm import tqdm
 from textwrap import wrap
 import csv
 
-files = ['../sherlock/'+x for x in os.listdir('../sherlock')]
+files = [cfg.data_path+x for x in os.listdir(cfg.data_path)]
 files.sort()
 
 text = ""
@@ -16,32 +16,33 @@ for file in files:
     with open(file, 'r', encoding='utf-8') as f:
         text += f.read()
 
-text = wrap(text, 1024)
+# text = wrap(text, 1024)
 # text[-1] = text[-1] + " "*(1024 - len(text[-1]))
-
+print(len(text))
 tokenizer = Tokenizer(name=cfg.tokenizer_model)
 vocab_size = tokenizer.vocab_size
 
 print(f"Vocab size of {vocab_size}")
 
-encoding = []
+# encoding = []
 
-for t in text:
-    encoding += list(tokenizer.encode(t))
+# for t in text:
+#     encoding += list(tokenizer.encode(t))
 
-encoding = torch.cat(encoding, dim = 0)
+# encoding = torch.cat(encoding, dim = 0)
 # encoding = torch.tensor(encoding)
-
-print(f"number of tokens after encoding: {len(encoding)*1024}")
-
+encoding = tokenizer.encode(text)
+print(type(encoding))
+print(f"encoding shape: {encoding.shape}")
 n = int(len(encoding) * cfg.train_val_split)
 train = encoding[:n]
 val = encoding[n:]
 
 model = LanguageModel(vocab_size=vocab_size)
-
+# model.summary()
 print(sum(p.numel() for p in model.parameters())/1e6, 'M parameters')
 # print(f"Number of parameters is {torch.numel(model.parameters())}")
+# assert False
 
 def get_batch(split):
     data = train if split == "train" else val
@@ -54,14 +55,16 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 sentence = "I went to the clinic today and Sherlock came in running."
 # prediction
-idx = torch.tensor(tokenizer.encode(sentence)[0], dtype = torch.long).view(1, -1)
+idx = torch.tensor(tokenizer.encode(sentence), dtype = torch.long).view(1, -1)
 # print(idx)
+# print(tokenizer.decode(idx.view(-1,)))
 # idx = torch.zeros((1, 1))
 out_tokens = model.generate_sequence(idx, max_new_tokens = 20)[0].tolist()
 output= tokenizer.decode(out_tokens)
 print()
 print("OUTPUT:", "".join(output))
 print()
+# assert False
 
 losses = []
 for step in tqdm(range(cfg.epochs)):
@@ -73,15 +76,24 @@ for step in tqdm(range(cfg.epochs)):
     loss.backward()
     optimizer.step()
 
-    if step%(cfg.epochs//50) == 0:
+    mod = cfg.epochs // 50
+    if step%(max(mod, 1)) == 0:
         print(f"step: {step}")
         # out = tokenizer.
-        res = tokenizer.decode(model.generate_sequence(idx, max_new_tokens = 20)[0].tolist())
+        res = tokenizer.decode(model.generate_sequence(idx, max_new_tokens = 150)[0].tolist())
         print(f"res : {''.join(res)}")
         print(f"loss: {loss.item()}")
         print()
         losses.append([step, loss.item(), ''.join(res)])
 
-with open("log.csv", "w") as f:
-    wr = csv.writer(f)
-    wr.writerows(losses)
+if cfg.log_name:
+    if not os.path.exists('results/'):
+        os.makedirs('results/')
+    with open('results/' + cfg.log_name, "w") as f:
+        wr = csv.writer(f)
+        wr.writerows(losses)
+
+if cfg.save_model:
+    if not os.path.exists('results/'):
+        os.makedirs('results/')
+    torch.save(model.state_dict(), 'results/' + cfg.save_model )

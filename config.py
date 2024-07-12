@@ -1,10 +1,13 @@
+data_path = '../sherlock/'
 batch_size = 64
 block_size = 16
 device = 'cpu'
 tokenizer_model = "gpt2"
-n_embed = 32
-dropout_rate = 0.2
+n_embed = 128
+dropout_rate = 0.4
 num_heads = 4
-n_blocks = 4
+n_blocks = 6
 train_val_split = 0.8
-epochs = 500
+epochs = 10000
+save_model = "sherlock" #empty if not saving the model
+log_name = "log" # empty to not save log
