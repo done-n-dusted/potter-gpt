@@ -77,9 +77,10 @@ losses = []
 for step in tqdm(range(cfg['epochs'])):
     
     xb, yb = get_batch('train')
-    
+    xval, yval = get_batch('val')
     logits, loss = model(xb, yb)
     optimizer.zero_grad(set_to_none=True)
+    _, val_loss = model(xval, yval)
     loss.backward()
     optimizer.step()
 
@@ -89,18 +90,19 @@ for step in tqdm(range(cfg['epochs'])):
         # out = tokenizer.
         res = tokenizer.decode(model.generate_sequence(idx, max_new_tokens = 150)[0].tolist())
         print(f"res : {''.join(res)}")
-        print(f"loss: {loss.item()}")
+        print(f"training loss: {loss.item()}")
+        print(f"validation loss: {val_loss.item()}")
         print()
         losses.append([step, loss.item(), ''.join(res)])
 
 if cfg['log_name']:
     if not os.path.exists('results/'):
         os.makedirs('results/')
-    with open('results/' + cfg['log_name'], "w") as f:
+    with open('results/' + cfg['log_name'] + '.csv', "w") as f:
         wr = csv.writer(f)
         wr.writerows(losses)
 
 if cfg['save_model']:
     if not os.path.exists('results/'):
         os.makedirs('results/')
-    torch.save(model.state_dict(), 'results/' + cfg['save_model'] )
+    torch.save(model.state_dict(), 'results/' + cfg['save_model'] + '.pth' )
