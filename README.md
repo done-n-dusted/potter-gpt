@@ -36,7 +36,10 @@ The file `config.yml` contains the hyperparameters for training the transformer 
 - **LanguageModel** Module contains the whole architecture. It is basically a set of blocks following each other. This class also has a `generate_sequence` method that returns the embedding of the following words which can be decoded with the above defined `tokenizer`.
 
 ## Main
-`main.py` contains the overall wrapper of the entire architecture. The training loop takes in hyperparameters from the `config.yml` file and trains the model. It prints the loss and an inference *50* times in total regardless of the number of steps taken.
+`main.py` contains the overall wrapper of the entire architecture. The training loop takes in hyperparameters from the `config.yml` file and trains the model. It prints the loss and an inference *50* times in total regardless of the number of steps taken. Run the whole transformer after the setup with the following command:
+```
+$ python main.py
+```
 
 ## Logging
 Logging can be controlled in the `config.yml` file. `save_model` saves the model in `results/` folder. `log_name` corresponds to the `csv` file in which the log is saved.
